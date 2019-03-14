@@ -1,8 +1,1 @@
-2.1 done
-2.2 done through half of 2.2.6 (who are we kidding, read all of 2)
-3.2 (all of 3)
-3.3
-4.2 (all of 4)
-4.3
-8.1
 8.2

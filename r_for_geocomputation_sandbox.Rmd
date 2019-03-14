@@ -744,12 +744,6 @@ plot(st_geometry(cycle_hire), col = "blue")
 plot(st_geometry(cycle_hire_osm), add = TRUE, pch = 3, col = "red")
 
 
-z = st_join(cycle_hire_P, cycle_hire_osm_P, st_is_within_distance, dist = 20)
-nrow(cycle_hire)
-#> [1] 742
-nrow(z)
-#> [1] 762
-
 any(st_touches(cycle_hire, cycle_hire_osm, sparse = FALSE))
 #> [1] FALSE
 
@@ -781,17 +775,231 @@ plot(cycle_hire_osm["capacity"])
 plot(z["capacity"])
 ```
 
-```{r}
+```{r 4.2.5}
 nz_avheight = aggregate(x = nz_height, by = nz, FUN = mean)
-
-
 
 nz_avheight2 = nz %>%
   st_join(nz_height) %>%
   group_by(Name) %>%
   summarize(elevation = mean(elevation, na.rm = TRUE))
 
+agg_aw = st_interpolate_aw(incongruent[, "value"], aggregating_zones,
+                           extensive = TRUE)
+#> Warning in st_interpolate_aw.sf(incongruent[, "value"],
+#> aggregating_zones, : st_interpolate_aw assumes attributes are constant over
+#> areas of x
+# show the aggregated result
+agg_aw$value
+#> [1] 19.6 25.7
+
+```
+
+```{r 4.2.6}
+
+nz_heighest = nz_height %>% top_n(n = 1, wt = elevation)
+canterbury_centroid = st_centroid(canterbury)
+st_distance(nz_heighest, canterbury_centroid)
+#> Units: [m]
+#>        [,1]
+#> [1,] 115540
 
 
+nz_heighest = nz_height %>% top_n(n = 1, wt = elevation)
+canterbury_centroid = st_centroid(canterbury)
+st_distance(nz_heighest, canterbury_centroid)
+#> Units: [m]
+#>        [,1]
+#> [1,] 115540
+
+
+co = filter(nz, grepl("Canter|Otag", Name))
+st_distance(nz_height[1:3, ], co)
+#> Units: [m]
+#>        [,1]  [,2]
+#> [1,] 123537 15498
+#> [2,]  94283     0
+#> [3,]  93019     0
+
+
+plot(st_geometry(co)[2])
+plot(st_geometry(nz_height)[2:3], add = TRUE)
+
+
+
+```
+
+```{r 4.3.1}
+
+id = cellFromXY(elev, xy = c(0.1, 0.1))
+elev[id]
+# the same as
+raster::extract(elev, data.frame(x = 0.1, y = 0.1))
+
+
+
+clip = raster(xmn = 0.9, xmx = 1.8, ymn = -0.45, ymx = 0.45,
+              res = 0.3, vals = rep(1, 9))
+elev[clip]
+#> [1] 18 24
+# we can also use extract
+# extract(elev, extent(clip))
+
+
+elev[1:2, drop = FALSE]    # spatial subsetting with cell IDs
+elev[1, 1:2, drop = FALSE] # spatial subsetting by row,column indices
+#> class       : RasterLayer 
+#> dimensions  : 1, 2, 2  (nrow, ncol, ncell)
+#> ...
+
+
+elev[1:2, drop = FALSE]    # spatial subsetting with cell IDs
+elev[1, 1:2, drop = FALSE] # spatial subsetting by row,column indices
+#> class       : RasterLayer 
+#> dimensions  : 1, 2, 2  (nrow, ncol, ncell)
+#> ...
+
+
+# create raster mask
+rmask = elev 
+values(rmask) = sample(c(NA, TRUE), 36, replace = TRUE)
+
+
+# spatial subsetting
+elev[rmask, drop = FALSE]           # with [ operator
+mask(elev, rmask)                   # with mask()
+overlay(elev, rmask, fun = "max")   # with overlay
+
+```
+
+```{r 4.3.3}
+
+rcl = matrix(c(0, 12, 1, 12, 24, 2, 24, 36, 3), ncol = 3, byrow = TRUE)
+recl = reclassify(elev, rcl = rcl)
+
+
+elev + elev
+elev^2
+log(elev)
+elev > 5
+
+```
+
+
+```{r 4.3.4}
+
+r_focal = focal(elev, w = matrix(1, nrow = 3, ncol = 3), fun = min)
+
+
+```
+
+
+```{r 4.3.5}
+
+z = zonal(elev, grain, fun = "mean") %>%
+  as.data.frame()
+z
+#>   zone mean
+#> 1    1 17.8
+#> 2    2 18.5
+#> 3    3 19.2
+
+```
+
+
+
+```{r 4.3.7}
+
+aut = getData("alt", country = "AUT", mask = TRUE)
+ch = getData("alt", country = "CHE", mask = TRUE)
+aut_ch = merge(aut, ch)
+
+```
+
+
+
+```{r 8}
+
+library(sf)
+library(raster)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+
+
+library(tmap)    # for static and interactive maps
+library(leaflet) # for interactive maps
+library(mapview) # for interactive maps
+library(ggplot2) # tidyverse vis package
+library(shiny)   # for web applications
+
+```
+
+
+
+```{r}
+
+# Add fill layer to nz shape
+tm_shape(nz) +
+  tm_fill() 
+
+# Add border layer to nz shape
+tm_shape(nz) +
+  tm_borders() 
+
+# Add fill and border layers to nz shape
+tm_shape(nz) +
+  tm_fill() +
+  tm_borders() 
+
+```
+
+```{r 8.2.2}
+
+map_nz = tm_shape(nz) + tm_polygons()
+class(map_nz)
+#> [1] "tmap"
+
+
+map_nz1 = map_nz +
+  tm_shape(nz_elev) + tm_raster(alpha = 0.7)
+
+
+nz_water = st_union(nz) %>% st_buffer(22200) %>% 
+  st_cast(to = "LINESTRING")
+map_nz2 = map_nz1 +
+  tm_shape(nz_water) + tm_lines()
+
+
+map_nz3 = map_nz2 +
+  tm_shape(nz_height) + tm_dots()
+
+
+tmap_arrange(map_nz1, map_nz2, map_nz3)
+
+```
+
+```{r}
+
+ma1 = tm_shape(nz) + tm_fill(col = "red")
+ma2 = tm_shape(nz) + tm_fill(col = "red", alpha = 0.3)
+ma3 = tm_shape(nz) + tm_borders(col = "blue")
+ma4 = tm_shape(nz) + tm_borders(lwd = 3)
+ma5 = tm_shape(nz) + tm_borders(lty = 2)
+ma6 = tm_shape(nz) + tm_fill(col = "red", alpha = 0.3) +
+  tm_borders(col = "blue", lwd = 3, lty = 2)
+tmap_arrange(ma1, ma2, ma3, ma4, ma5, ma6)
+
+
+plot(st_geometry(nz), col = nz$Land_area)  # works
+tm_shape(nz) + tm_fill(col = nz$Land_area) # fails
+#> Error: Fill argument neither colors nor valid variable name(s)
+
+
+tm_shape(nz) + tm_fill(col = "Land_area")
+
+
+legend_title = expression("Area (km"^2*")")
+map_nza = tm_shape(nz) +
+  tm_fill(col = "Land_area", title = legend_title) + tm_borders()
 ```
 
